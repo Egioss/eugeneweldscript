@@ -1,0 +1,234 @@
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+
+-- Prevent duplicate GUIs if executed multiple times
+local guiName = "TargetFollowGUI_123"
+local parentLocation = pcall(function() return CoreGui.Name end) and CoreGui or player:WaitForChild("PlayerGui")
+if parentLocation:FindFirstChild(guiName) then
+	parentLocation[guiName]:Destroy()
+end
+
+--================================--
+--        GUI CREATION            --
+--================================--
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = guiName
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = parentLocation
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 250, 0, 180)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -90)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 35)
+TopBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 8)
+TopBarCorner.Parent = TopBar
+
+-- Hide bottom corners of TopBar to blend with MainFrame
+local TopBarHider = Instance.new("Frame")
+TopBarHider.Size = UDim2.new(1, 0, 0, 8)
+TopBarHider.Position = UDim2.new(0, 0, 1, -8)
+TopBarHider.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TopBarHider.BorderSizePixel = 0
+TopBarHider.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Target Follower"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 35, 0, 35)
+MinimizeBtn.Position = UDim2.new(1, -35, 0, 0)
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 20
+MinimizeBtn.Parent = TopBar
+
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, 0, 1, -35)
+ContentFrame.Position = UDim2.new(0, 0, 0, 35)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+local TargetBox = Instance.new("TextBox")
+TargetBox.Size = UDim2.new(1, -20, 0, 35)
+TargetBox.Position = UDim2.new(0, 10, 0, 15)
+TargetBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TargetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetBox.PlaceholderText = "Target Name (Partial works)"
+TargetBox.Font = Enum.Font.Gotham
+TargetBox.TextScaled = true -- Mobile friendly
+TargetBox.Parent = ContentFrame
+Instance.new("UICorner", TargetBox).CornerRadius = UDim.new(0, 6)
+
+local DistanceBox = Instance.new("TextBox")
+DistanceBox.Size = UDim2.new(1, -20, 0, 35)
+DistanceBox.Position = UDim2.new(0, 10, 0, 60)
+DistanceBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+DistanceBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+DistanceBox.PlaceholderText = "Distance Behind (Default: 3)"
+DistanceBox.Text = "3"
+DistanceBox.Font = Enum.Font.Gotham
+DistanceBox.TextScaled = true -- Mobile friendly
+DistanceBox.Parent = ContentFrame
+Instance.new("UICorner", DistanceBox).CornerRadius = UDim.new(0, 6)
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(1, -20, 0, 40)
+ToggleBtn.Position = UDim2.new(0, 10, 0, 105)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113) -- Green
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Text = "Start"
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextScaled = true -- Mobile friendly
+ToggleBtn.Parent = ContentFrame
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
+
+--================================--
+--      DRAG & MINIMIZE LOGIC     --
+--================================--
+local dragging, dragInput, dragStart, startPos
+
+TopBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = MainFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+TopBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+local minimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	ContentFrame.Visible = not minimized
+	if minimized then
+		MainFrame.Size = UDim2.new(0, 250, 0, 35)
+		MinimizeBtn.Text = "+"
+	else
+		MainFrame.Size = UDim2.new(0, 250, 0, 180)
+		MinimizeBtn.Text = "-"
+	end
+end)
+
+--================================--
+--        CORE SCRIPT LOGIC       --
+--================================--
+local con
+local isRunning = false
+
+local function stop()
+	if con then 
+        con:Disconnect() 
+        con = nil 
+    end
+	pcall(function() sethiddenproperty(player.Character.HumanoidRootPart, "PhysicsRepRootPart", nil) end)
+	isRunning = false
+	ToggleBtn.Text = "Start"
+	ToggleBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+end
+
+local function start()
+	local whoyouwannakill = TargetBox.Text
+	local howfaryouwannabebehindthem = tonumber(DistanceBox.Text) or 3
+	
+	if whoyouwannakill:gsub("%s+", "") == "" then
+		ToggleBtn.Text = "Enter a name!"
+		task.wait(1)
+		if not isRunning then ToggleBtn.Text = "Start" end
+		return
+	end
+
+	local tp = (function()
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p ~= player and (p.Name:lower():find(whoyouwannakill:lower()) or (p.DisplayName or ""):lower():find(whoyouwannakill:lower())) then 
+                return p 
+            end
+		end
+	end)()
+	
+	if not tp then 
+		ToggleBtn.Text = "Player not found!"
+		task.wait(1.5)
+		if not isRunning then ToggleBtn.Text = "Start" end
+		return 
+	end
+
+	isRunning = true
+	ToggleBtn.Text = "Stop (" .. tp.Name .. ")"
+	ToggleBtn.BackgroundColor3 = Color3.fromRGB(231, 76, 60) -- Red
+
+	local tRoot = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
+	tp.CharacterAdded:Connect(function(c) 
+        tRoot = c:WaitForChild("HumanoidRootPart") 
+    end)
+
+	con = RunService.Heartbeat:Connect(function()
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if not root or player.Character.Humanoid.Health <= 0 then 
+            stop() 
+            return 
+        end
+		if not tRoot or not tRoot:IsDescendantOf(workspace) then
+			tRoot = tp.Character and tp.Character:FindFirstChild("HumanoidRootPart")
+			if not tRoot then return end
+		end
+		
+		pcall(function() sethiddenproperty(root, "PhysicsRepRootPart", tRoot) end)
+		root.CFrame = tRoot.CFrame * CFrame.new(0, 0, howfaryouwannabebehindthem)
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
+	end)
+end
+
+ToggleBtn.MouseButton1Click:Connect(function()
+	if isRunning then
+		stop()
+	else
+		start()
+	end
+end)
+
+player.CharacterRemoving:Connect(stop)
